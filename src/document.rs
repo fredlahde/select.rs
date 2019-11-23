@@ -30,7 +30,7 @@ impl Document {
 
     pub fn from_read<R: io::Read>(mut readable: R) -> io::Result<Document> {
         let mut byte_tendril = ByteTendril::new();
-        try!(readable.read_to_tendril(&mut byte_tendril));
+        readable.read_to_tendril(&mut byte_tendril)?;
 
         match byte_tendril.try_reinterpret() {
             Ok(str_tendril) => Ok(Document::from(str_tendril)),
