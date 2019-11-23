@@ -1,7 +1,4 @@
-use std::{fmt, io};
-
-use html5ever::tendril::StrTendril;
-use html5ever::{serialize, LocalName, QualName};
+use std::fmt;
 
 use document::Document;
 use predicate::Predicate;
@@ -10,9 +7,9 @@ use selection::Selection;
 /// The Node type specific data stored by every Node.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Data {
-    Text(StrTendril),
-    Element(QualName, Vec<(QualName, StrTendril)>),
-    Comment(StrTendril),
+    Text(String),
+    Element(String, Vec<(String, String)>),
+    Comment(String),
 }
 
 /// Internal representation of a Node. Not of much use without a reference to a
@@ -66,7 +63,7 @@ impl<'a> Node<'a> {
     /// Get the name of a Node if it is an HTML element, or None otherwise.
     pub fn name(&self) -> Option<&'a str> {
         match *self.data() {
-            Data::Element(ref name, _) => Some(&name.local),
+            Data::Element(ref name, _) => Some(&name),
             _ => None,
         }
     }
@@ -75,10 +72,10 @@ impl<'a> Node<'a> {
     pub fn attr(&self, name: &str) -> Option<&'a str> {
         match *self.data() {
             Data::Element(_, ref attrs) => {
-                let name = LocalName::from(name);
+                let name = name;
                 attrs
                     .iter()
-                    .find(|&&(ref name_, _)| name == name_.local)
+                    .find(|&&(ref name_, _)| name == name_)
                     .map(|&(_, ref value)| value.as_ref())
             }
             _ => None,
@@ -142,22 +139,6 @@ impl<'a> Node<'a> {
         }
     }
 
-    /// Serialize a Node to an HTML string.
-    pub fn html(&self) -> String {
-        let mut buf = Vec::new();
-        serialize::serialize(&mut buf, self, Default::default()).unwrap();
-        String::from_utf8(buf).unwrap()
-    }
-
-    /// Serialize a Node's children to an HTML string.
-    pub fn inner_html(&self) -> String {
-        let mut buf = Vec::new();
-        for child in self.children() {
-            serialize::serialize(&mut buf, &child, Default::default()).unwrap();
-        }
-        String::from_utf8(buf).unwrap()
-    }
-
     /// Search for Nodes fulfilling `predicate` in the descendants of a Node.
     pub fn find<P: Predicate>(&self, predicate: P) -> Find<'a, P> {
         Find {
@@ -208,14 +189,14 @@ impl<'a> Node<'a> {
 
 impl<'a> fmt::Debug for Node<'a> {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        struct Attrs<'a>(&'a [(QualName, StrTendril)]);
+        struct Attrs<'a>(&'a [(String, String)]);
 
         impl<'a> fmt::Debug for Attrs<'a> {
             fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
                 self.0
                     .iter()
                     .fold(f.debug_list(), |mut f, &(ref name, ref value)| {
-                        f.entry(&(&*name.local, &&**value));
+                        f.entry(&(&*name, &&**value));
                         f
                     })
                     .finish()
@@ -234,41 +215,11 @@ impl<'a> fmt::Debug for Node<'a> {
             Data::Text(ref text) => f.debug_tuple("Text").field(&&**text).finish(),
             Data::Element(ref name, ref attrs) => f
                 .debug_struct("Element")
-                .field("name", &&*name.local)
+                .field("name", &&*name)
                 .field("attrs", &Attrs(attrs))
                 .field("children", &Children(self))
                 .finish(),
             Data::Comment(ref comment) => f.debug_tuple("Comment").field(&&**comment).finish(),
-        }
-    }
-}
-
-impl<'a> serialize::Serialize for Node<'a> {
-    fn serialize<S: serialize::Serializer>(
-        &self,
-        serializer: &mut S,
-        traversal_scope: serialize::TraversalScope,
-    ) -> io::Result<()> {
-        match *self.data() {
-            Data::Text(ref text) => serializer.write_text(&text),
-            Data::Element(ref name, ref attrs) => {
-                let attrs = attrs.iter().map(|&(ref name, ref value)| (name, &**value));
-
-                serializer.start_elem(name.clone(), attrs)?;
-
-                for child in self.children() {
-                    serialize::Serialize::serialize(
-                        &child,
-                        serializer,
-                        traversal_scope.clone()
-                    )?;
-                }
-
-                serializer.end_elem(name.clone())?;
-
-                Ok(())
-            }
-            Data::Comment(ref comment) => serializer.write_comment(&comment),
         }
     }
 }
@@ -373,7 +324,7 @@ impl<'a> Iterator for Children<'a> {
 }
 
 pub struct Attrs<'a> {
-    inner: Option<::std::slice::Iter<'a, (QualName, StrTendril)>>,
+    inner: Option<::std::slice::Iter<'a, (String, String)>>,
 }
 
 impl<'a> Iterator for Attrs<'a> {
@@ -382,7 +333,7 @@ impl<'a> Iterator for Attrs<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.as_mut().and_then(|it| {
             it.next()
-                .map(|&(ref name, ref value)| (name.local.as_ref(), value.as_ref()))
+                .map(|&(ref name, ref value)| (name.as_ref(), value.as_ref()))
         })
     }
 }

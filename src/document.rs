@@ -69,11 +69,11 @@ impl From<StrTendril> for Document {
                     None
                 }
                 rcdom::NodeData::Text { ref contents } => {
-                    let data = node::Data::Text(contents.borrow().clone());
+                    let data = node::Data::Text((contents.clone().into_inner()).to_string());
                     Some(append(document, data, parent, prev))
                 }
                 rcdom::NodeData::Comment { ref contents } => {
-                    let data = node::Data::Comment(contents.clone());
+                    let data = node::Data::Comment((&contents).to_string());
                     Some(append(document, data, parent, prev))
                 }
                 rcdom::NodeData::Element {
@@ -81,11 +81,11 @@ impl From<StrTendril> for Document {
                     ref attrs,
                     ..
                 } => {
-                    let name = name.clone();
+                    let name = (&name.local).to_string();
                     let attrs = attrs
                         .borrow()
                         .iter()
-                        .map(|attr| (attr.name.clone(), attr.value.clone()))
+                        .map(|attr| ((&attr.name.local).to_string(), (&attr.value).to_string()))
                         .collect();
                     let data = node::Data::Element(name, attrs);
                     let index = append(document, data, parent, prev);
